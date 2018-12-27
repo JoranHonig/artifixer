@@ -2,7 +2,8 @@ from PIL import Image
 import numpy as np
 import click
 from PIL.ImageStat import Stat
-
+from PIL.ImageChops import difference
+from PIL.ImageFilter import BoxBlur
 
 def divide(imgA, imgB):
     a = np.asarray(imgA)
@@ -42,6 +43,40 @@ def newton(e, input, base, output):
 
     fixed = fix(to_fix, img, profile, e)
     fixed.save(output, "PNG")
+
+    R, G, B = 0, 1, 2
+
+    i_split = img.split()
+
+    def rf(p):
+        if abs(p - avg[R]) > 10:
+            return 255
+        else:
+            return 0
+
+    def gf(p):
+        if abs(p - avg[G]) > 10:
+            return 255
+        else:
+            return 0
+
+    def bf(p):
+        if abs(p - avg[B]) > 10:
+            return 255
+        else:
+            return 0
+    mr = i_split[R].point(rf)
+
+    mg = i_split[G].point(gf)
+
+    mb = i_split[B].point(bf)
+
+    blurred = fixed.filter(BoxBlur(10))
+    fixed.paste(blurred, None, mr)
+    fixed.paste(blurred, None, mg)
+    fixed.paste(blurred, None, mb)
+
+    fixed.save("test.png", "PNG")
 
 
 if __name__ == "__main__":
