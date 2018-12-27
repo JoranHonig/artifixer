@@ -2,16 +2,12 @@ from PIL import Image
 import numpy as np
 import click
 from PIL.ImageStat import Stat
-from sklearn.neural_network import MLPRegressor
 
 
-def divide(imgA, imgB, e):
+def divide(imgA, imgB):
     a = np.asarray(imgA)
     b = np.asarray(imgB)
-
-    c = a / b.astype("float")
-
-    return c
+    return a / b.astype("float")
 
 
 def fix(img, base, profile, e):
@@ -21,6 +17,7 @@ def fix(img, base, profile, e):
 
     modded_profile = profile ** factor
     fixed = a / modded_profile
+
     return Image.fromarray(fixed.astype('uint8'))
 
 
@@ -39,16 +36,12 @@ def newton(e, input, base, output):
     img = Image.open(base)
     to_fix = Image.open(input)
 
-    # img.save("b_input.png", "PNG")
-    # to_fix.save("t_input.png", "PNG")
-
     avg = Stat(img)._getmedian()
     e_img = Image.new(img.mode, img.size, (avg[0], avg[1], avg[2], avg[3]))
-    profile = divide(img, e_img, e)
+    profile = divide(img, e_img)
 
     fixed = fix(to_fix, img, profile, e)
     fixed.save(output, "PNG")
-
 
 
 if __name__ == "__main__":
