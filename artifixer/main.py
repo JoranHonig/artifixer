@@ -19,7 +19,7 @@ import numpy as np
 import click
 from PIL.ImageStat import Stat
 from PIL.ImageChops import difference
-from PIL.ImageFilter import BoxBlur
+from PIL.ImageFilter import BoxBlur, GaussianBlur, MedianFilter
 
 def divide(imgA, imgB):
     a = np.asarray(imgA)
@@ -53,15 +53,16 @@ def cli():
 @click.option('--output', help="Name of the output image", required=True)
 def newton(e, b, t, input, base, output):
     img = Image.open(base)
-    to_fix = Image.open(input)
+    to_fix: Image.Image = Image.open(input)
+
 
     avg = Stat(img)._getmedian()
     # e_img = Image.new(img.mode, img.size, (avg[0], avg[1], avg[2], avg[3]))
-    e_img = img.filter(BoxBlur(70))
+    e_img = img.filter(BoxBlur(30))
     profile = divide(img, e_img)
 
     fixed = fix(to_fix, img, profile, e)
-    fixed.save(output, "PNG")
+    fixed.save(output + ".without_blur", "PNG")
 
     R, G, B = 0, 1, 2
     i_split = img.split()
@@ -91,7 +92,7 @@ def newton(e, b, t, input, base, output):
     fixed.paste(blurred, None, mg)
     fixed.paste(blurred, None, mb)
 
-    fixed.save("blurred_" + output, "PNG")
+    fixed.save(output, "PNG")
 
 
 if __name__ == "__main__":
