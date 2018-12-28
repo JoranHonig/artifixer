@@ -18,8 +18,8 @@ from PIL import Image
 import numpy as np
 import click
 from PIL.ImageStat import Stat
-from PIL.ImageChops import difference
-from PIL.ImageFilter import BoxBlur, GaussianBlur, BLUR
+from PIL.ImageChops import difference, logical_or
+from PIL.ImageFilter import BoxBlur, GaussianBlur, BLUR, MaxFilter
 
 def divide(imgA, imgB):
     a = np.asarray(imgA)
@@ -56,7 +56,7 @@ def newton(e, b, t, input, base, output):
     to_fix = Image.open(input)
 
     # Apply blanc image fix strategy
-    expected_img = blanc.filter(BoxBlur(70))
+    expected_img = blanc.filter(BoxBlur(90))
     profile = divide(blanc, expected_img)
 
     first_pass = fix(to_fix, blanc, profile, e)
@@ -65,36 +65,32 @@ def newton(e, b, t, input, base, output):
     # Create mask
     R, G, B = 0, 1, 2
     avg = Stat(blanc)._getmedian()
-    i_split = blanc.split()
 
-    def rf(p):
-        if abs(p - avg[R]) > t:
+    d = Image.fromarray(np.abs(np.asarray(blanc) / np.asarray(expected_img).astype("float") * 100).astype("uint8"))
+    i_split = d.split()
+
+    def tr(p):
+        if p < t:
             return 255
         else:
             return 0
 
-    def gf(p):
-        if abs(p - avg[G]) > t:
-            return 255
-        else:
-            return 0
+    m = i_split[G].point(tr)
+    mr = i_split[R].point(tr)
+    mb = i_split[B].point(tr)
 
-    def bf(p):
-        if abs(p - avg[B]) > t:
-            return 255
-        else:
-            return 0
+    m = m.filter(MaxFilter(5))
+    mr = mr.filter(MaxFilter(5))
+    mb = mb.filter(MaxFilter(5))
 
-    mr = i_split[R].point(rf)
-    mg = i_split[G].point(gf)
-    mb = i_split[B].point(bf)
+    m.save("diff.png", "PNG")
 
     # Apply box blur strategy
     second_pass = first_pass.filter(BoxBlur(b))
 
     # Put the results in the original image
+    to_fix.paste(second_pass, None, m)
     to_fix.paste(second_pass, None, mr)
-    to_fix.paste(second_pass, None, mg)
     to_fix.paste(second_pass, None, mb)
 
     # save
