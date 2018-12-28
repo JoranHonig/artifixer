@@ -19,7 +19,7 @@ import numpy as np
 import click
 from PIL.ImageStat import Stat
 from PIL.ImageChops import difference
-from PIL.ImageFilter import BoxBlur, GaussianBlur, MedianFilter
+from PIL.ImageFilter import BoxBlur, GaussianBlur, BLUR
 
 def divide(imgA, imgB):
     a = np.asarray(imgA)
@@ -47,25 +47,26 @@ def cli():
 @cli.command()
 @click.option('-e', help="Strength of the filter", default=1.6)
 @click.option('-b', help="Blur radius", default=20)
-@click.option('-t', help="Blur threshold.", default=10)
+@click.option('-t', help="Strategy threshold.", default=20)
 @click.option('--input', help="Input image file", required=True)
 @click.option('--base', help="Base even image, this is used to find the dust specs and calculate the filter", required=True)
 @click.option('--output', help="Name of the output image", required=True)
 def newton(e, b, t, input, base, output):
-    img = Image.open(base)
-    to_fix: Image.Image = Image.open(input)
+    blanc = Image.open(base)
+    to_fix = Image.open(input)
 
+    # Apply blanc image fix strategy
+    expected_img = blanc.filter(BoxBlur(70))
+    profile = divide(blanc, expected_img)
 
-    avg = Stat(img)._getmedian()
-    # e_img = Image.new(img.mode, img.size, (avg[0], avg[1], avg[2], avg[3]))
-    e_img = img.filter(BoxBlur(30))
-    profile = divide(img, e_img)
+    first_pass = fix(to_fix, blanc, profile, e)
+    first_pass.save(output + ".without_blur", "PNG")
 
-    fixed = fix(to_fix, img, profile, e)
-    fixed.save(output + ".without_blur", "PNG")
-
+    # Create mask
     R, G, B = 0, 1, 2
-    i_split = img.split()
+    avg = Stat(blanc)._getmedian()
+    i_split = blanc.split()
+
     def rf(p):
         if abs(p - avg[R]) > t:
             return 255
@@ -83,16 +84,21 @@ def newton(e, b, t, input, base, output):
             return 255
         else:
             return 0
+
     mr = i_split[R].point(rf)
     mg = i_split[G].point(gf)
     mb = i_split[B].point(bf)
 
-    blurred = fixed.filter(BoxBlur(b))
-    fixed.paste(blurred, None, mr)
-    fixed.paste(blurred, None, mg)
-    fixed.paste(blurred, None, mb)
+    # Apply box blur strategy
+    second_pass = first_pass.filter(BoxBlur(b))
 
-    fixed.save(output, "PNG")
+    # Put the results in the original image
+    to_fix.paste(second_pass, None, mr)
+    to_fix.paste(second_pass, None, mg)
+    to_fix.paste(second_pass, None, mb)
+
+    # save
+    to_fix.save(output, "PNG")
 
 
 if __name__ == "__main__":
